@@ -40,7 +40,7 @@ prescription_summary <- map_df(monthly_prescription, ~fread(.x) %>%
   clean_names()
 # Check the combined data
 summary(prescription_summary)
-str(prescription_summary)
+
 ```
 
 ## Health board and population data 
