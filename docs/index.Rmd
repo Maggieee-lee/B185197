@@ -75,7 +75,7 @@ prescribed_GLP1RA_summary <- prescribed_GLP1RA %>%
 
 ```
 
-### Classfication and Adjustment for Defined Daily Dose Index
+### Classfication of Prescription
 ```{r}
 prescription_classification <- prescribed_GLP1RA %>% 
   mutate(medication_type = case_when(
@@ -87,28 +87,8 @@ prescription_classification <- prescribed_GLP1RA %>%
       grepl("Lyxumia", bnf_item_description, ignore.case = TRUE) ~ "Lixisenatide",
       TRUE ~ "Other"
     )) 
-
-prescription_dosage <- prescription_classification %>%
-  mutate(
-    dosage_per_unit_mg = case_when(
-      str_detect(bnf_item_description, "MG") ~ as.numeric(str_extract(bnf_item_description, "\\d+(\\.\\d+)?(?=MG)")),
-      str_detect(bnf_item_description, "MICROGRAMS") ~ as.numeric(str_extract(bnf_item_description, "\\d+(\\.\\d+)?(?=MICROGRAMS)")) / 1000, 
-      TRUE ~ NA
-    )) %>% 
-  mutate(total_quantity_dispensed_mg = number_of_paid_items * dosage_per_unit_mg
-  )
-
-# Join with the DDD reference to normalize by DDD
-  # Read the DDD index CSV file
-DDD_index <- read_csv(here("data", "DDD_GLP-1_analogues.csv"))
-prescriptions_with_ddd <- prescription_dosage %>%
-  full_join(DDD_index, join_by (medication_type == Name)) %>% 
-  mutate(number_of_DDDs_dispensed = total_quantity_dispensed_mg / DDD) %>% 
-  group_by(medication_type) %>% 
-  summarise (adjusted_prescription_by_DDDs = sum(number_of_DDDs_dispensed)) %>% 
-  arrange(desc(adjusted_prescription_by_DDDs))
-
 ```
+
 ### Data Manipuation for Regional Difference
 ```{r}
 #Calculate the number of paid items per 10,000 patients in each health board. 
@@ -203,5 +183,29 @@ most_prescribed <- prescribed_GLP1RA_summary %>%
   ) %>%
   opt_row_striping()
 most_prescribed
+
+```
+
+### Adjustment for Defined Daily Dose Index
+```{r}
+prescription_dosage <- prescription_classification %>%
+  mutate(
+    dosage_per_unit_mg = case_when(
+      str_detect(bnf_item_description, "MG") ~ as.numeric(str_extract(bnf_item_description, "\\d+(\\.\\d+)?(?=MG)")),
+      str_detect(bnf_item_description, "MICROGRAMS") ~ as.numeric(str_extract(bnf_item_description, "\\d+(\\.\\d+)?(?=MICROGRAMS)")) / 1000, 
+      TRUE ~ NA
+    )) %>% 
+  mutate(total_quantity_dispensed_mg = number_of_paid_items * dosage_per_unit_mg
+  )
+
+# Join with the DDD reference to normalize by DDD
+  # Read the DDD index CSV file
+DDD_index <- read_csv(here("data", "DDD_GLP-1_analogues.csv"))
+prescriptions_with_ddd <- prescription_dosage %>%
+  full_join(DDD_index, join_by (medication_type == Name)) %>% 
+  mutate(number_of_DDDs_dispensed = total_quantity_dispensed_mg / DDD) %>% 
+  group_by(medication_type) %>% 
+  summarise (adjusted_prescription_by_DDDs = sum(number_of_DDDs_dispensed)) %>% 
+  arrange(desc(adjusted_prescription_by_DDDs))
 
 ```
