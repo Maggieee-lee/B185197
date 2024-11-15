@@ -113,6 +113,28 @@ prescriptions_with_ddd <- prescription_dosage %>%
 ```{r}
 #Calculate the number of paid items per 10,000 patients in each health board. 
 adjusted_hb_prescription <- prescription_classification %>%
+  group_by(hb_name, medication_type, paid_date_month) %>%
+  summarise(total_paid_items = sum(number_of_paid_items, na.rm = TRUE)) %>%
+  left_join(census_data, by = "hb_name") %>%
+  mutate(prescriptions_per_10000 = (total_paid_items / hb_population) * 10000) %>% 
+  arrange(-prescriptions_per_10000)
+
+adjusted_hb_prescription_Oral <- adjusted_hb_prescription %>% 
+  filter(str_detect(medication_type, "Oral"))
+
+```
+### Data Visualization
+```{r}
+# load the Healthboard Shapefile
+NHS_healthboards <- st_read(here("data", "NHS_healthboards_2019.shp")) %>% 
+  mutate(HBName = paste("NHS", HBName))
+prescription_hb<- NHS_healthboards %>%
+  full_join(adjusted_hb_prescription_Oral, join_by(HBName == hb_name))%>% 
+   mutate(month = as.factor(paid_date_month))
+
+map_Oral_per_10k <- prescription_hb %>%
+  ggplot(aes(fill = prescriptions_per_10000)) + 
+  geom_sf(size = 0.1, colour = "black") +
    scale_fill_distiller(
     palette = "Greens", 
     direction = 1,
