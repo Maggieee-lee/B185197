@@ -27,7 +27,7 @@ Despite clinical benefits, the launch and adoption of GLP-1 receptor agonists va
 
 This data report aims to bridge the existing gap by examining the latest trends in the prescribing of GLP-1 receptor agonists (GLP-1RAs) in Scotland. It will focus on regional variations in prescription rates, potential geographical differences among health boards, disparities in the frequency and cost of use across different medication types, and the impact of obesity rates and socioeconomic status on prescribing patterns. This analysis provides timely insights into how GLP-1RAs are being deployed to combat public health challenges like obesity and diabetes. By contextualizing these findings within the broader healthcare landscape, this work might provide insights into GLP-1RAs’ prescribing behaviours and possibly inform future strategies for optimizing the use of GLP-1RAs in Scotland’s healthcare system.
 
-#### load Packages
+#### Load Packages
 ```{r}
 # Install and load necessary packages
 library(tidyverse)
@@ -361,7 +361,7 @@ socioeconomic_status_CA <- read_csv(here("data", "SES_CA.csv"), skip = 10) %>%
 ```
 
 **Combine data for prescription analysis**
-```{r, fig.width=8, fig.height=10}
+```{r, fig.width=10, fig.height=10}
 # Data wrangling
 joined_obesity_SES_council_area <- prescription_classification %>%
   filter(str_detect(medication_type, "Dulaglutide|Oral semaglutide")) %>%
@@ -420,7 +420,9 @@ I used ChatGPT to evaluate where the comments for justifying my codes should be 
 
 ## Reference
 Bensignor, M.O. et al. (2022) ‘Glucagon-like peptide-1 receptor agonist prescribing patterns in adolescents with type 2 diabetes’, Diabetes, Obesity and Metabolism, 24(7), pp. 1380–1384. Available at: https://doi.org/10.1111/dom.14681.
+
 WHO Global Health Estimates (no date). Available at: https://www.who.int/data/global-health-estimates (Accessed: 25 November 2024).
+
 Müller, T.D. et al. (2022) ‘Anti-obesity drug discovery: advances and challenges’, Nature Reviews Drug Discovery, 21(3), pp. 201–223. Available at: https://doi.org/10.1038/s41573-021-00337-8.
 
 
