@@ -6,13 +6,28 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
+## Table of Content
+#### -Research Question
+#### -Background and Introduction
+#### -Results
+#### -Conclusion and Future direction
+#### -Reference
 
-### Research Question
-The relationship between recent novel GLP-1 agonists prescription trends, age, geographical variation, and socioeconomic status in Scotland
 
+## Research Question 
+#### The research question: What are the recent prescribing trends of GLP-1 receptor agonists (GLP-1 RAs) in Scotland, and how do factors such as geographical variations, obesity rates, and socioeconomic status influence prescribing behaviors? 
 
+## Background and Introduction
+
+Diabetes has been a rising concern in recent years. The number of people with diabetes worldwide surged dramatically from 200 million in 1990 to 830 million in 2022 (WHO, no date). The epidemic of diabetes has imposed significant public health and economic burdens, resulting in 1.6 million deaths and USD 966 billion in diabetes-related expenditures in 2021.  The majority of individuals (~90%) diagnosed with diabetes are cases of Type II diabetes (T2D). According to the latest Scottish Diabetes Survey, the growing prevalence of diabetes, with 353,088 individuals diagnosed with diabetes in 2023, reflects a 4.15% annual increase. The development of Type II diabetes is involved in genetic, behavioural, environmental, and socioeconomic factors. Obesity or overweight is one of the leading risk factors for metabolic diseases, particularly T2D. With obesity and T2D, the incidence of complications and comorbid conditions, including cardiovascular diseases (CVD), heart attack, and stroke, is increased drastically. Weight reduction could lead to a decrease of CVD and T2D risk by lowering cholesterol and glucose levels. GLP-1 receptor agonists are advanced treatments that have recently become blockbuster drugs for weight loss and are rapidly being adopted in the global healthcare landscape due to their dual role in managing Type 2 diabetes (T2D) and obesity. GLP-1 receptor agonists mimic the action of incretin hormones, GLP-1 (glucagon-like peptide). This hormone produced in the small intestine plays a multifaceted role in metabolic regulation. GLP-1R agonists (GLP-1RA), targeting the GLP-1 receptors, could slow gastric emptying in the stomach, suppressing food intake. GLP-1 agonists also promote endogenous insulin secretion in the pancreas, regulating postprandial glucose levels. GLP-1 agonists further reduce appetite and regulate satiety by sending signals to the central nervous system in the related brain regions, further aiding in weight management (Müller et al., 2022). Several approved GLP-1 medications, such as semaglutide (Ozempic, Wegovy) and dulaglutide (Trulicity), have shown unprecedented effects on regulating body weight and glucose metabolism. For instance, Müller et al. (2022) reported individuals receiving 2.4 mg semaglutide once-weekly treatment reduced 14.9% of weight in a 68-week trial, outperforming other pharmacological options.  GLP-1RA also offers benefits beyond sustained weight loss, decreasing glucose levels and cardiovascular events. These mechanisms contribute to effective blood glucose control and weight reduction, potentially lowering comorbidities. Overall, its dual benefits on weight and diabetes management could potentially address epidemics of Type 2 diabetes and obesity, aligning with the broader goals of chronic disease management. 
+
+Despite clinical benefits, the launch and adoption of GLP-1 receptor agonists varies significantly across regions, influenced by factors such as healthcare policies, socioeconomic factors, and prescribing practices. It also possibly influences the shift of medication use with scaled utilization. Previous literature analysed prescribing patterns of GLP-1RAs in various regions based on electrical health records and real-world data (Bensignor et al., 2022). However, there still remains a gap with the limited data in understanding how these advanced therapies are utilized in localized contexts in Scotland.
+
+This data report aims to bridge the existing gap by examining the latest trends in the prescribing of GLP-1 receptor agonists (GLP-1RAs) in Scotland. It will focus on regional variations in prescription rates, potential geographical differences among health boards, disparities in the frequency and cost of use across different medication types, and the impact of obesity rates and socioeconomic status on prescribing patterns. This analysis provides timely insights into how GLP-1RAs are being deployed to combat public health challenges like obesity and diabetes. By contextualizing these findings within the broader healthcare landscape, this work might provide insights into GLP-1RAs’ prescribing behaviours and possibly inform future strategies for optimizing the use of GLP-1RAs in Scotland’s healthcare system.
+
+#### load Packages
 ```{r}
 # Install and load necessary packages
 library(tidyverse)
@@ -24,13 +39,16 @@ library(here)
 library(data.table)
 library(purrr) 
 library(sf)
+library(plotly)
+library(ggiraph)
+library(scales)
+library(shades)
 ```
 
-### Import the data
-
-## Prescription data 
-*Data manipulation and cleaning*
-```{r, echo=FALSE}
+#### Import the data
+**Data manipulation and cleaning**
+```{r}
+# I directly downloaded data files from 12 consecutive months from the website (August 2023 - August 2024) on https://www.opendata.nhs.scot/dataset/prescriptions-in-the-community. I put them into a folder called prescription within the data file.
 monthly_prescription <- list.files(path = here("data", "prescription"),
                pattern = "csv",
                full.names = TRUE) 
@@ -38,174 +56,372 @@ monthly_prescription <- list.files(path = here("data", "prescription"),
 prescription_summary <- map_df(monthly_prescription, ~fread(.x) %>%
   mutate(DMDCode = as.character(DMDCode))) %>%   
   clean_names()
-# Check the combined data
-summary(prescription_summary)
-
 ```
 
-## Health board and population data 
+#### Health board and population data 
 ```{r include=TRUE}
-heathboard_list <- read_csv("https://www.opendata.nhs.scot/dataset/9f942fdb-e59e-44f5-b534-d6e17229cc7b/resource/652ff726-e676-4a20-abda-435b98dd7bdc/download/hb14_hb19.csv") %>% 
+#Load and clean the data required for further analysis including population, regional data
+heathboard_list <- read_csv("https://www.opendata.nhs.scot/dataset/9f942fdb-e59e-44f5-b534-d6e17229cc7b/resource/652ff726-e676-4a20-abda-435b98dd7bdc/download/hb14_hb19.csv") %>% # load health board data
   clean_names()
-
-census_data <- read_csv(here("data", "UV103_age_health_board_census.csv"), skip = 10) %>% 
-  select(-...6) %>% 
-  rename(
-         hb_name = "Health Board Area 2019",
-         hb_population = Count)%>% 
-  # filter the data so that we get the population of the entire health board
-  filter(Age == "All people" & Sex == "All people") %>% 
-  # select only the relevant columns
+# This dataset is downloaded from https://www.scotlandscensus.gov.uk/webapi/jsf/tableView/tableView.xhtml
+census_data <- read_csv(here("data", "UV103_age_health_board_census.csv"), skip = 10) %>%   select(-...6) %>% #load and clean census data
+  rename(hb_name = "Health Board Area 2019",
+         hb_population = Count) %>% 
+  # filter the data to get the population of the entire health board
+  filter(Sex == "All people" & Age == "All people") %>% 
   select(hb_name, hb_population) %>% 
-  # match the prescription data
+  # change health board names to match the prescription data
   mutate(hb_name = paste("NHS", hb_name))
 ```
 
-## Focus on the Glucagon-like peptide-1 (GLP-1) analogues medication
+#### Focus on the Glucagon-like peptide-1 (GLP-1) analogues medication
+**View of Descriptive Statistics**
 ```{r}
+#Data wrangling
 joined_hb_data <- prescription_summary%>% 
-  full_join(heathboard_list, join_by(hbt == hb))
+  full_join(heathboard_list, join_by(hbt == hb)) #join the data with healthboard for further analysis
 
+# Filter GLP-1 RA medications based brand name showing in the prescription data
 prescribed_GLP1RA <- joined_hb_data %>% 
   filter(str_detect(bnf_item_description, "OZEMPIC|WEGOVY|SEMAGLUTIDE|TRULICITY|SAXENDA|RYBELSUS|VICTOZA|BAYETTA|BYDUREON|LYXUMIA")) 
-prescribed_GLP1RA_summary <- prescribed_GLP1RA %>% 
-  group_by(bnf_item_description) %>%
-  summarise(total_prescription = sum(paid_quantity,na.rm = TRUE),
-            total_paid_items = sum(number_of_paid_items, na.rm = TRUE))
-
-```
-
-### Classfication of Prescription
-```{r}
+# Classify each prescription into counterpart medication type
 prescription_classification <- prescribed_GLP1RA %>% 
-  mutate(medication_type = case_when(
-      grepl("Ozempic|Wegovy|Semaglutide", bnf_item_description, ignore.case = TRUE) ~ "Semaglutide",
-      grepl("Rybelsus", bnf_item_description, ignore.case = TRUE) ~ "Oral semaglutide",
-      grepl("Saxenda|Victoza", bnf_item_description, ignore.case = TRUE) ~ "Liraglutide",
-      grepl("Trulicity", bnf_item_description, ignore.case = TRUE) ~ "Dulaglutide",
-      grepl("Bydureon|Bayetta", bnf_item_description, ignore.case = TRUE) ~ "Exenatide",
-      grepl("Lyxumia", bnf_item_description, ignore.case = TRUE) ~ "Lixisenatide",
-      TRUE ~ "Other"
-    )) 
+    mutate(medication_type = case_when(
+    str_detect(bnf_item_description, "OZEMPIC|WEGOVY|SEMAGLUTIDE") ~ "Semaglutide",
+    str_detect(bnf_item_description, "RYBELSUS") ~ "Oral semaglutide",
+    str_detect(bnf_item_description, "SAXENDA|VICTOZA") ~ "Liraglutide",
+    str_detect(bnf_item_description, "TRULICITY") ~ "Dulaglutide",
+    str_detect(bnf_item_description, "BYDUREON|BAYETTA") ~ "Exenatide",
+    str_detect(bnf_item_description, "LYXUMIA") ~ "Lixisenatide",
+    TRUE ~ "Other"
+  ))
+summary(prescription_classification)
+```
+## Key Results
+
+### Summary of Prescribing Patterns of the Most Prescribed GLP-1 receptor Agonits in Scotland (2023-2024)
+
+Table 1 summarises prescribing patterns, costs, and percentage share of GLP-1 receptor agonist medications used for managing obesity and type 2 diabetes in Scotland over the year. The medication type indicates the official name of the drug. The medication brand name is the specific product name with the brand clarified. Total prescriptions are calculated based on the total paid quantities of each medication product reported in the prescription data from NHS Scotland. Total ingredient cost is the cumulative cost in the prescription data over the reporting period. The percentage share shows a general proportion of the total prescriptions attributed to each specific medication, showing its relative popularity. Rybelsus 7mg, 14mg, and 3mg tablets are major prescriptions for GLP-1 RA medications, collectively accounting for 84.46% of all GLP-1 agonist prescriptions. Oral tablets are likely more accessible and convenient than subcutaneous injections, contributing to the higher proportion of prescriptions. All other medications are delivered by the injection pen. Trulicity 1.5 mg injection pre-filled pen (dulaglutide) is the most prescribed injectable GLP-1 agonist. Liraglutide (Victoza) and Exenatide (Bydureon) have less prescription volume, probably due to weak market competitiveness, limited stock availability, and prescription preferences. The possible reason could be further analysed. Additionally, the dosage form and delivery method should be further analysed. Injectable medications like Trulicity and Ozempic, though less frequently prescribed, are associated with higher ingredient costs, suggesting they may be preferentially adopted for patients requiring specific regimens or for whom oral options are unsuitable. Evaluating patient long-term adherence data and clinical outcomes alongside these prescription patterns can help assess the real-world effectiveness and acceptance of these therapies. 
+
+```{r}
+# Summarize data for top-ranking medications
+top_medications <- prescription_classification %>%
+  group_by(medication_type, bnf_item_description) %>%
+  summarise(
+    total_prescriptions = sum(paid_quantity, na.rm = TRUE), # Calculate total prescriptions 
+    total_ingredient_cost = sum(gross_ingredient_cost, na.rm = TRUE), # Calculate total ingredient cost (£) 
+    .groups = "drop" # Drop grouping after summarising
+  ) %>%
+  slice_max(total_prescriptions, n = 10) # Select top 10 medications
 ```
 
-### Data Manipuation for Regional Difference
+**Generating the Table**
 ```{r}
-#Calculate the number of paid items per 10,000 patients in each health board. 
-adjusted_hb_prescription <- prescription_classification %>%
-  group_by(hb_name, medication_type, paid_date_month) %>%
-  summarise(total_paid_items = sum(number_of_paid_items, na.rm = TRUE)) %>%
-  left_join(census_data, by = "hb_name") %>%
-  mutate(prescriptions_per_10000 = (total_paid_items / hb_population) * 10000) %>% 
-  arrange(-prescriptions_per_10000)
-
-adjusted_hb_prescription_Oral <- adjusted_hb_prescription %>% 
-  filter(str_detect(medication_type, "Oral"))
+# Manipulate the data for calculating the total prescriptions sum and the percentage share for each medication
+most_prescribed <- top_medications %>% 
+  mutate(total_prescriptions_sum = sum(total_prescriptions),  # Total of all prescriptions
+    percentage_share = round((total_prescriptions / total_prescriptions_sum) * 100, 2), # Calculate percentage share
+    bnf_item_description = tools::toTitleCase(tolower(bnf_item_description))) %>% # Convert medication name to title case
+  select(-total_prescriptions_sum) %>% 
+  group_by(medication_type) %>% 
+  gt(row_group_as_column = TRUE) %>%  # Use gt() to create a table with grouped rows
+  
+# Set table styling including headers, column titles, format of reported number to become more descriptive and for better readibility
+  tab_header(title =  "Table 1. Top 10 Most Prescribed GLP-1 Agonist Medications in Scotland 2023-2024",
+             subtitle = "Data from NHS Scotland") %>%
+  cols_label(medication_type = "Medication Name (Type)",
+             bnf_item_description = "Medication Brand Name",
+             total_prescriptions = "Total Prescriptions",
+             total_ingredient_cost = "Total Ingredient Cost (£)" ,
+             percentage_share = "Percentage Share of Total Prescriptions (%)") %>% 
+  fmt_number(columns = c(total_prescriptions, total_ingredient_cost),
+             decimals = 0,
+             use_seps = TRUE) %>%
+  # Add more styling to the header for emphasis
+  tab_stubhead(label = "Medication type") %>%
+  tab_style(
+    style = list(cell_text(weight = "bold")),
+    locations = list(cells_stubhead())
+    ) %>% 
+  tab_style(
+    style = list(cell_text(weight = "bold", color = "white"),
+                 cell_fill(color = "#003087")), # background for the header
+    locations = cells_title(groups = "title")) %>%
+  tab_style(
+    style = list(cell_text(weight = "bold", color = "white"),
+                 cell_fill(color = "#005EB8")), #background for the header
+    locations = cells_title(groups = "subtitle")) %>%
+  # Add background color to rows for clarity
+  data_color(columns = c(total_prescriptions),colors = scales::col_numeric(palette = c("#f7fbff", "#2171b5"),domain = NULL)) %>%
+  #Adjust column alignment to center for all columns
+  cols_align(align = "center",
+             columns = everything()) %>%
+  opt_row_striping()# Enable row striping
+  most_prescribed # Display the final table
 
 ```
-### Data Visualization
+
+**Geographical Data Visualization**
 ```{r}
+#Data manipuation for regional difference
+# Join the datasets to include the population data
+joined_census_data <- prescribed_GLP1RA %>% 
+  left_join(census_data, by = "hb_name")
+
+# Filter for the Rybelsus 7mg prescriptions (Oral Semaglutide)
+hb_oralsemaglutide <- joined_census_data %>% 
+  filter(str_detect(bnf_item_description, "RYBELSUS 7MG")) 
+
+# Group the data by health board (hb_name) to evaluate regional prescription disparites
+geographical_diff_hb <- hb_oralsemaglutide %>%
+  group_by(hb_name, bnf_item_description, hb_population) %>%  
+  summarise(total_prescriptions = sum(paid_quantity, na.rm = TRUE), .groups = "drop") %>% 
+  mutate(prescriptions_per_10k = (total_prescriptions / hb_population) * 10000) %>% 
+  arrange(-prescriptions_per_10k)
+
 # load the Healthboard Shapefile
-NHS_healthboards <- st_read(here("data", "NHS_healthboards_2019.shp")) %>% 
+NHS_healthboards <- st_read(here("data", "NHS_healthboards_2019.shp"), quiet = TRUE) %>% 
   mutate(HBName = paste("NHS", HBName))
-prescription_hb<- NHS_healthboards %>%
-  full_join(adjusted_hb_prescription_Oral, join_by(HBName == hb_name))%>% 
-   mutate(month = as.factor(paid_date_month))
+# Join the geographical data with the prescriptions data
+prescription_rybelsus_hb<- NHS_healthboards %>%
+  full_join(geographical_diff_hb, join_by(HBName == hb_name)) %>% 
+  group_by(HBName) %>% 
+  summarise(total_prescription_per10k = sum(prescriptions_per_10k))
+# Create the map plot showing geographical distribution of prescriptions
+map_plot <- prescription_rybelsus_hb %>%
+  ggplot(aes(fill = total_prescription_per10k)) + 
+  geom_sf(size = 1, colour = "black") +# Plot the spatial data with black borders around each health board
+   scale_fill_distiller(palette = "Blues",
+                        name = "Oral semaglutide\nPrescriptions\nper 10k Population",
+                        direction = 1
+  ) +
+  labs(title = "Geographical Distribution of Prescriptions \nby Health Board (per 10,000 Population)"
+  )+
+  theme_bw() +
+  theme(
+    legend.position = "right", # Position the legend on the right
+    plot.title = element_text(hjust = 0.5)) # Center the title
+```
 
-map_Oral_per_10k <- prescription_hb %>%
-  ggplot(aes(fill = prescriptions_per_10000)) + 
-  geom_sf(size = 0.1, colour = "black") +
-   scale_fill_distiller(
-    palette = "Greens", 
-    direction = 1,
-    name = "Oralsemaglutide\nPrescriptions\nper 10,000"
+### Regional Analysis of Rybelsus 7 mg Tablets (Oral Semaglutide) Prescriptions Across Health Boards in Scotland
+
+Based on the insight gained from Table 1, we tend to focus on the most prescribed drug Rybelsus 7mg tablet and investigate the geographical differences in prescription rate. By integrating prescription data with population data and geographical boundaries, it evaluates differences in prescribing patterns normalised by population size (per 10,000 residents). The horizontal bar chart in the panel could help to visualise the top-ranked health boards and quantitively compare the prescription quantities. The choropleth map on the left side clearly emphasises the variations and increasing number of prescriptions with a gradient from light blue to dark blue. These two sections are color-coded to correspond with their respective health boards, providing a clear visual distinction for each region. Health boards such as NHS Lothian, NHS Borders, and NHS Tayside are leading regions with higher prescription quantities of Rybelsus. Future analysis will integrate detailed urban-rural classification to further understand the healthcare resource availability and the necessity of interventions to ensure equitable access behind the prescription behaviour. It probably reveals the concentration of prescriptions in densely populated urban regions
+
+```{r}
+# Create the plot for regional differences in Rybelsus prescriptions across health boards
+oralsemaglutide_regional_diff_plot <- geographical_diff_hb %>% 
+  ggplot(aes(x = reorder(hb_name, prescriptions_per_10k), y = prescriptions_per_10k, fill = prescriptions_per_10k)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +  # Bar plot with no legend
+  coord_flip() +  # Flip coordinates to make bars horizontal
+  scale_fill_gradient(low = "#41B6E6", high = "#003087") + # Use a gradient color scale from light blue to dark blue for the bars matched to map style
+  labs(
+    title = "Health Board Rankings \nby Prescription Quantities",
+    x = "Health Board",
+    y = "Prescriptions per 10k Population"
+  ) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), #adjust the x, y-axis label
+        axis.title.x = element_text(size = 12),
+        axis.text.y = element_text(size = 10, 
+      face = "bold", 
+      lineheight = 0.9),
+    axis.title.y = element_text(size = 12)) +
+    scale_x_discrete(labels = label_wrap(width = 20))
+
+```
+
+```{r, fig.width=12, fig.height=8}
+# Load the 'patchwork' library to combine graphs into one layout
+library(patchwork)
+
+# Combine the two plots 
+panel_layout <- map_plot + oralsemaglutide_regional_diff_plot +
+  plot_layout(ncol = 2, widths = c(1, 1)) +  # Edit the layout
+  plot_annotation(
+    title = "Figure 1. Rybelsus 7mg Tablet (Oral Semaglutide) Prescription Analysis",
+    caption = "Data Source: NHS Scotland",
+    theme = theme(
+      plot.title = element_text(size = 16, face = "bold"),
+      plot.subtitle = element_text(size = 12))) 
+# Display the panel layout
+panel_layout
+
+```
+
+### Monthly Trends of Rybelsus (Oral Semaglutide) Prescriptions
+Figure 2 effectively shows the total monthly prescriptions of Rybelsus 7mg tablet across the top five health boards from August 2023 to August 2024. Health boards in the legend of the graph are ranked by total prescription quantity from highest to lowest. There is a clear increasing trend of prescribing the GLP-1 RAs medication across consecutive months, with a larger increase around February to May 2024.  However, this trend exhibits variation across different health boards. NHS Western Isles and NHS Fife display slower increases compared to NHS Lothian and NHS Borders. NHS Western Isles and NHS Tayside experienced minor fluctuations within June-July 2024 time intervals. These data suggest regional disparities in prescription adoption or resource availability. Overall, this analysis indicates that GLP-1 RA prescriptions have a steady growth with increasing awareness and demands throughout 2023-2024. Hovering over each point in this interactive plot enable to check exact prescription number of each month across health boards.
+
+```{r}
+# Data wrangling
+# Calculate the total number of prescriptions for each group and create a new column for prescriptions per 10,000 population.
+temporal_rybelsus_prescription <- hb_oralsemaglutide %>% 
+  group_by(hb_name, paid_date_month, hb_population) %>% 
+  summarise(total_prescriptions = sum(paid_quantity, na.rm = TRUE), .groups = "drop") %>% 
+  mutate(prescriptions_per_10k = (total_prescriptions / hb_population) * 10000) %>% 
+  mutate(paid_date_month = ym(paid_date_month))     # Convert to Date format (year-month)
+
+# Aggregate the data to get the total prescriptions per 10k for each health board.
+# Rank the health boards based on the sum of total prescriptions.
+top_hb <- temporal_rybelsus_prescription %>%
+  group_by(hb_name) %>%
+  summarise(total_prescription_sum = sum(prescriptions_per_10k)) %>%
+  slice_max(total_prescription_sum, n = 5) %>% 
+  arrange(desc(total_prescription_sum))
+
+# Filter the data to include only the top health boards
+temporal_prescription_tophb <- temporal_rybelsus_prescription %>%
+  filter(hb_name %in% top_hb$hb_name) %>% # Filter data to include only the top health boards
+  mutate(hb_name = factor(hb_name, levels = top_hb$hb_name))  # Reorder based on sum of total prescriptions
+
+# Create a time-series plot of prescriptions per 10k for the top health boards, with interactive features.
+temporal_pattern_plot <- temporal_prescription_tophb %>% 
+  ggplot(aes(
+    x = paid_date_month, 
+    y = prescriptions_per_10k, 
+    color = hb_name, 
+    group = hb_name)) +
+  geom_line_interactive(size = 1, alpha = 0.9) +  # Set line size and transparency
+  geom_point_interactive(size = 3, aes(tooltip = paste0( "Health Board: ", hb_name,"\nDate: ", paid_date_month, "\nTotal: ", round(prescriptions_per_10k, 2)))) + # Add interactive points with detailed tooltips
+  lightness(scale_color_brewer(palette = "Blues", direction = -1),scalefac(0.9)) + # Adjust color lightness and apply color palette
+  scale_x_date(
+    date_labels = "%b %Y",  # Month-Year format
+    date_breaks = "1 month"  # Set x-axis ticks at 1-month intervals
   ) +
   labs(
-    title = "Oral Semaglutide Prescriptions per 10,000 People by Health Board",
-    subtitle = "Scotland",
+    title = "Figure 2. Top Health Boards Prescriptions of Rybelsus 7mg Tablet (Oral Semaglutide) Over Time",
+    subtitle =  "August 2023 - August 2024",
+    x = "Month",
+    y = "Total Prescriptions of Rybelsus 7mg Tablet",
+    color = "Health Board\n(Ranked by Total Prescriptions)" ,
     caption = "Data Source: NHS Scotland"
   ) +
-  theme_minimal() +
-  theme(
-    legend.position = "right",
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5)
-  )+
-  facet_wrap(~ month, ncol = 3) 
-map_Oral_per_10k
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  
+
+# Add interactivity using ggiraph
+interactive_plot <- girafe(
+  ggobj = temporal_pattern_plot, # Pass the ggplot object for interactivity
+  width_svg = 8, height_svg = 6,  # Set the size of the SVG canvas
+  options = list(
+    opts_hover(css = "stroke-width: 4px; stroke-opacity: 1;transition: all 0.3s ease;"),  # Bold lines when hovered
+    opts_hover_inv(css = "opacity: 0.5; filter:saturate(10%);"),  # Dim other lines when not hovered
+    opts_selection(type = "multiple", only_shiny = FALSE), # Enable multiple selection if needed
+    opts_zoom(min = 0.5, max = 2), # Enable zoom
+    opts_toolbar(saveaspng = TRUE)))  # Enable "Save as PNG" option
+# Display the interactive plot
+interactive_plot # Show the plot in the viewer with interactive features
+
 ```
 
-*Comments: There is an overall increasing trend of prescribing the GLP-1 RA medication across consecutive months. However, this trend exhibits variation across different health boards.  I plan to further explore potential correlations between prescribing patterns and regional factors such as obesity rates, demographic characteristics, and socioeconomic status, I might specify to datazones if it's necessary. I also considered about analysing the most prescribed medication types of GLP-1 agonists.
+### Impact of Obesity Rate and Low Socioeconomic Status (SES) Percentage on Prescription Rate
+
+To capture a more granular understanding of prescribing patterns, this analysis shifts from broad health board regions to council areas, where we can expect larger diversities in demographics such as ethnicities and SES. These factors could lead to variations in medication uptake. This analysis aims to identify how local population characteristics influence prescribed patterns of GLP-1RAs in the top 15 most prescribed council areas. Figure 3 shows two faceted plots, presenting the relationship between obesity rates (x-axis) and low SES percentages (y-axis) for different council areas. The two top prescribed medication types, oral semaglutide and dulaglutide (injection pens) referred to in Table 1, are visualised and compared. There is an overall positive trend observed in both dulaglutide and Oral semaglutide. The trend that higher obesity rates correlate with higher low SES percentages is consistent across most council areas. It reflects socioeconomic disadvantage potentially accompanied by larger obesity prevalence. 
+
+Areas with elevated low socioeconomic burdens seem to have more prescriptions. Larger bubbles (representing higher prescription rates) align closer to the upper-right corner, where obesity rates and SES percentages are higher. There is a noticeable difference in prescription patterns across different council areas. Interestingly, the City of Edinburgh and East Lothian are two outliers which stand out with higher prescription quantity per 10k population but relatively low obesity rates and lower SES percentages. These differences possibly implicate disparities in healthcare access, awareness, or population demographics. The areas with high low socioeconomic classification percentages with smaller bubble sizes might indicate limited access and merit further attention to the medication needs. Hovering over each point in this interactive plot could check more information on its counteract health board and the specific numbers of obesity rates and low SES percentages
 
 
-### Generating a Table
+
 ```{r}
-most_prescribed <- prescribed_GLP1RA_summary %>% 
-  slice_max(total_prescription , n = 10) %>% 
-  gt() %>% 
-# Set table title and subtitle
-  tab_header(
-    title = "Top 10 Most Prescribed GLP-1 Agonist Medications",
-    subtitle = "Data from NHS Scotland"
-  ) %>%
-  cols_label(bnf_item_description = "Medication Brand Name",
-             total_prescription = "Total Prescription",
-             total_paid_items = "Number of Paid Items") %>% 
-  # Format the 'total_prescription' column with commas
-  fmt_number(
-    columns = c(total_prescription),
-    decimals = 0,
-    use_seps = TRUE
-  ) %>%
-  
-  # Add styling to the header for emphasis
-  tab_style(
-    style = list(
-      cell_text(weight = "bold", color = "white"),
-      cell_fill(color = "#2C3E50") # Dark background for the header
-    ),
-    locations = cells_title(groups = "title")
-  ) %>%
-  
-  # Add background color to rows for visual clarity
-  data_color(
-    columns = c(total_prescription),
-    colors = scales::col_numeric(
-      palette = c("#f7fbff", "#2171b5"),
-      domain = NULL
-    )
-  ) %>%
-  
-  # Adjust column alignment
-  cols_align(
-    align = "center",
-    columns = everything()
-  ) %>%
-  opt_row_striping()
-most_prescribed
+#Load Council Data
+council_area_list <- read_csv("https://www.opendata.nhs.scot/dataset/9f942fdb-e59e-44f5-b534-d6e17229cc7b/resource/967937c4-8d67-4f39-974f-fd58c4acfda5/download/ca11_ca19.csv")
+
+# Clean GP Practice data
+#The data is obtain from https://data.spatialhub.scot/dataset/gp_practices-is, this csv file is one of downloaded options. It's provided by www.spatialdata.gov.scot
+gp_practice <- read_csv(here("data", "GP_Practices_Scotland.csv")) %>% 
+  mutate(local_authority = str_replace(local_authority, "Eilean Siar", "Na h-Eileanan Siar")) %>% 
+  rename(council_area = "local_authority") %>% # Rename 'council_area' for consistency across datasets.
+  select(prac_code, council_area) # Select relevant columns for further analysis
+
+# Load and clean regional obesity data
+# This data is obtained from https://scotland.shinyapps.io/sg-scottish-health-survey/ clicking the data and ticking the council-level data and obesity option the csv file coud be downloaded
+regional_obesity_data <- read_csv(here("data", "obesity_scotstat.csv")) %>% 
+  rename(obesity_rate = "Percent",
+         CAName = "Location") %>% 
+  filter(Year == "2016-2019" , Categories == "Obesity", Sex == "All") %>% # Filter data needed for further analysis
+  mutate(CAName = str_replace(CAName, "Edinburgh City", "City of Edinburgh")) %>% 
+  left_join(council_area_list, by = "CAName") %>% 
+  select (Year, CAName, obesity_rate, HBName) %>% # Select relevant columns
+  distinct() # Remove duplicates if there are any
+
+# Load and reprocess socioeconomic classification data for council areas
+socioeconomic_status_CA <- read_csv(here("data", "SES_CA.csv"), skip = 10) %>% 
+  clean_names() %>% 
+  select(-x5) %>%  # Remove the unnecessary column
+  rename(socioeconomic_classification = "national_statistics_socio_economic_classification_ns_se_c") %>% 
+  mutate(general_ses = case_when(
+    str_detect(socioeconomic_classification, "L10: Lower supervisory occupations|L11: Lower technical occupations|L12: Semi-routine occupations|L13: Routine occupations|L14.1: Never worked|L14.2: Long-term unemployed") ~ "Low_SES",
+    socioeconomic_classification== "All people aged 16 and over" ~ "total_population"
+  )) %>%
+  group_by(council_area_2019, general_ses) %>%
+  summarise(total_population = sum(count, na.rm = TRUE)) %>% 
+  filter(!is.na(general_ses)) %>% 
+  pivot_wider(names_from = general_ses, values_from = total_population) %>% # Reshape data to wider format
+  mutate(low_ses_percentage = (Low_SES / total_population) * 100)
 
 ```
 
-### Adjustment for Defined Daily Dose Index
-```{r}
-prescription_dosage <- prescription_classification %>%
-  mutate(
-    dosage_per_unit_mg = case_when(
-      str_detect(bnf_item_description, "MG") ~ as.numeric(str_extract(bnf_item_description, "\\d+(\\.\\d+)?(?=MG)")),
-      str_detect(bnf_item_description, "MICROGRAMS") ~ as.numeric(str_extract(bnf_item_description, "\\d+(\\.\\d+)?(?=MICROGRAMS)")) / 1000, 
-      TRUE ~ NA
-    )) %>% 
-  mutate(total_quantity_dispensed_mg = number_of_paid_items * dosage_per_unit_mg
-  )
+**Combine data for prescription analysis**
+```{r, fig.width=8, fig.height=10}
+# Data wrangling
+joined_obesity_SES_council_area <- prescription_classification %>%
+  filter(str_detect(medication_type, "Dulaglutide|Oral semaglutide")) %>%
+  left_join(gp_practice, by = c("gp_practice" = "prac_code")) %>% 
+  left_join(regional_obesity_data, by = c("council_area" = "CAName")) %>% 
+  left_join(socioeconomic_status_CA, by = c("council_area" = "council_area_2019")) %>% 
+  drop_na(council_area) %>% 
+  group_by(council_area, medication_type, obesity_rate, total_population, low_ses_percentage) %>%
+  summarise(total_prescriptions = sum(paid_quantity, na.rm = TRUE), .groups = "drop") %>% 
+  mutate(prescription_per_10k = (total_prescriptions / total_population) * 10000) 
+# Identify Top 15 council areas based on prescription rate
+top_15_ca_prescriptions <- joined_obesity_SES_council_area %>%
+  group_by(council_area) %>%
+  summarise(presciption_sum = sum(prescription_per_10k)) %>% 
+  arrange(desc(presciption_sum)) %>%
+  slice_head(n = 15) 
+ca_prescriptions <- joined_obesity_SES_council_area %>%
+  filter(council_area %in% top_15_ca_prescriptions$council_area)# Filter the original dataset to only include top 15
 
-# Join with the DDD reference to normalize by DDD
-  # Read the DDD index CSV file
-DDD_index <- read_csv(here("data", "DDD_GLP-1_analogues.csv"))
-prescriptions_with_ddd <- prescription_dosage %>%
-  full_join(DDD_index, join_by (medication_type == Name)) %>% 
-  mutate(number_of_DDDs_dispensed = total_quantity_dispensed_mg / DDD) %>% 
-  group_by(medication_type) %>% 
-  summarise (adjusted_prescription_by_DDDs = sum(number_of_DDDs_dispensed)) %>% 
-  arrange(desc(adjusted_prescription_by_DDDs))
+#Create a custom hover text to display additional information when hovering over a point.
+joined_data_visual <- ca_prescriptions %>% #
+  mutate(council_area = factor(council_area, levels = top_15_ca_prescriptions$council_area)) %>% 
+  mutate(hover_text = paste("Council Area: ", council_area , "<br>",
+                            "Obesity Rate: ", round(obesity_rate, 2), "%", "<br>",
+                            "Low SES rate:", round(low_ses_percentage, 2), "%", "<br>",
+                            "Prescription: ", round(prescription_per_10k, 2), " per 10k"))
 
+#Create Bubble Plot of Obesity Rate, SES, and Prescription Rate
+obesity_SES_Plot <- joined_data_visual %>% 
+  ggplot(aes(x = obesity_rate, y = low_ses_percentage, color = council_area , size = prescription_per_10k, text = hover_text)) +
+  geom_point(alpha = 0.7) +  # Bubble plot with transparency
+  geom_smooth(aes(group = 1), method = "lm", se = FALSE, color = "brown", linetype = "dashed") +
+  scale_size_continuous(name = "Prescription Rate \nper 10,000 people", range = c(2, 14)) +  #Scale bubble size and adjust its range
+  scale_color_viridis_d() +
+  labs(
+    title = "Figure 3. Impact of Obesity Rate and Low Socioeconomic Status Percentage on Prescription Rate",
+    subtitle = "Data Source: Scottish Heath Survey, NHS Scotland",
+    x = "Obesity Rate (%)",
+    y = "Low SES Percentage (%)",
+    color = "Council Area"
+  ) +
+  theme_bw()+
+  theme(legend.position = "right") +
+  facet_wrap(~ medication_type, ncol = 1) # Create separate plots for each medication type
+#Create Interactive Plot with Plotly
+interactive_plot <- ggplotly(obesity_SES_Plot, tooltip = c("text")) # The 'tooltip' argument specifies that hover text will show when hovering over the bubbles.
+interactive_plot
 ```
+
+## Conclusion and Further Steps
+This data report analyses the most prescribed medication types of GLP-1 receptor agonists in Scotland in 2023 - 2024. By visualising the prescribing trends using a map plot and bar chart, we identified the top health boards which have the higher prescription rate of oral semaglutide (Rybelsus Tablets). We also tracked the monthly change in prescribing trends of this medication using an interactive line plot. We further explored potential correlations between prescribing patterns of GLP-1 RAs and factors, such as obesity rates and socioeconomic status. The report provided valuable insight on prescription volumes across different GLP-1 RA medications and recognized the positive relationship between higher prescription rates and higher obesity prevalence with the increased low socioeconomic status percentage in several council areas. This analysis aims to address the gap in real-time tracking and understanding of the adoption of GLP-1 RAs as a popular treatment for obesity and diabetes management. However, the study is limited to data from a single year (2023-2024) due to the recent introduction and gradual adoption of these innovative therapies. In addition, the inadequate information in the prescription dataset constrains the cross-sectional comparison of different medications with varied dosages and forms. The patient adherence data cannot be evaluated; therefore it leaves uncertainty about the actual drug usage, leaving the need to further integrate additional information to enhance the validity of the analysis. Furthermore, while regional (14 health boards) and council-level analyses in Scotland were conducted, a more detailed study incorporating urban-rural classifications and access to healthcare services (GP practice distribution) could provide a nuanced view of the underlying reason for geographic disparities in prescribing patterns. To address these limitations, longitudinal datasets of prescriptions over extended periods should be collected to analyse long-term trends. Prescribing data with patient outcomes and adherence index would offer deeper insights into the effectiveness and acceptance of GLP-1RA treatments. Additionally, enhancing the data granularity to include diverse demographic features could refine our understanding of access and equity issues. The combination of prescription data and consideration of various perspectives in the healthcare system, such as prescription preferences of healthcare providers and health awareness of patients, might also reveal barriers to uptake and inform strategies or healthcare policies to ensure equitable access to these transformative therapies for chronic disease management.
+
+### Clarification for ChatGPT Use
+I used ChatGPT to evaluate where the comments for justifying my codes should be improved. I also used ChatGPT to outline the content, solely providing general bullet points (introduction, context, further steps) involved initially. I acknowledged that I sometimes checked the code problem, however, I took further investigation from many R-related website to resolve the issue at the end.
+
+
+## Reference
+Bensignor, M.O. et al. (2022) ‘Glucagon-like peptide-1 receptor agonist prescribing patterns in adolescents with type 2 diabetes’, Diabetes, Obesity and Metabolism, 24(7), pp. 1380–1384. Available at: https://doi.org/10.1111/dom.14681.
+WHO Global Health Estimates (no date). Available at: https://www.who.int/data/global-health-estimates (Accessed: 25 November 2024).
+Müller, T.D. et al. (2022) ‘Anti-obesity drug discovery: advances and challenges’, Nature Reviews Drug Discovery, 21(3), pp. 201–223. Available at: https://doi.org/10.1038/s41573-021-00337-8.
+
+
+
